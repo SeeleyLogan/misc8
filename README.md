@@ -1,5 +1,7 @@
 # MISC8: Minimum Instruction Set Computer
 
+![MISC8 after being powered, no program executed](./images/misc8_startup.jpg "MISC8")
+
 This project currently includes an emulator for my homebrew breadboard computer.
 
 Future programs will include an assembler and a compiler.
