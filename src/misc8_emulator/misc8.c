@@ -178,9 +178,9 @@ bool_t execute_instruction(misc8_t *misc8, u8_t instruction)
     break;
 
     case FETCHJ:
-        misc8->a_register = misc8->program[misc8->j_register];
         misc8->j_register = (CAST(misc8->program[(misc8->j_register + 1) & ADDR_MASK], u16_t) << 8) + CAST(misc8->program[misc8->j_register & ADDR_MASK], u8_t);
-    
+        misc8->a_register = misc8->program[misc8->j_register];
+        
         misc8->cycles_to_complete += 18;
     break;
 
