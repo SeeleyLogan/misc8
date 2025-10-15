@@ -1,21 +1,18 @@
-/* ls_misc8.h - misc8 emulator header definitions - Logan Seeley 2025 */
+/* emulator.h - misc8 emulator header definitions - Logan Seeley 2025 */
 
 
-#ifndef LS_MISC8_H
-#define LS_MISC8_H
+#ifndef LS_EMULATOR_H
+#define LS_EMULATOR_H
 
 
-#include <stdio.h>
-#include <string.h>
-
-#include "./ls_macros.h"
+#include <ls_macros.h>
 
 
 typedef struct misc8_s
 {
     u64_t  cycles_to_complete;
     
-    char   program[4096];
+    u8_t   program[4096];
     char   program_file_name[256];
 
     u16_t  program_counter;
@@ -27,7 +24,7 @@ typedef struct misc8_s
     bool_t carry_flag;
     bool_t zero_flag;
 
-    bool_t program_loaded;
+    bool_t is_program_loaded;
 }
 misc8_t;
 
@@ -53,21 +50,21 @@ misc8_t;
 #define ADDR_MASK 0xFFF
 
 
-misc8_t new_misc8(i32_t arg_c, string *arg_v);
+misc8_t new_misc8           (i32_t    arg_c,        char  **arg_v);
 
-void    parse_args(misc8_t *misc8, i32_t arg_c, string *arg_v);
-void    parse_program_flag(misc8_t *misc8, string arg);
+void    parse_args          (misc8_t *misc8,        i32_t   arg_c,          char **arg_v);
+void    parse_program_flag  (misc8_t *misc8,        char   *arg);
 
-void    load_program(misc8_t *misc8);
-void    run_program(misc8_t *misc8);
-bool_t  execute_instruction(misc8_t *misc8, u8_t instruction);
-void    get_instruction_name(misc8_t *misc8, string name);
-
-
-#include "./misc8.c"
+void    load_program        (misc8_t *misc8);
+void    run_program         (misc8_t *misc8);
+bool_t  execute_instruction (misc8_t *misc8,        u8_t    instruction);
+void    get_instruction_name(misc8_t *misc8,        char   *name);
 
 
-#endif  /* #ifndef LS_MISC8_H */
+#include "./emulator.c"
+
+
+#endif  /* #ifndef LS_EMULATOR_H */
 
 
 /*

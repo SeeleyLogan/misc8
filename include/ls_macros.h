@@ -26,8 +26,6 @@
 	typedef void 	 *  ls_void_p;
 	typedef ls_u64_t *	ls_u64_p;
 
-    typedef char     *  ls_string;
-
 	typedef ls_u32_t	ls_result_t;
 
 	#define LS_NULL		0
@@ -95,8 +93,6 @@
 
 	#define void_p      ls_void_p
 	#define u64_p       ls_u64_p
-
-    #define string      ls_string
 
 	#define result_t    ls_result_t
 

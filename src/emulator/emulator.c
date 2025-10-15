@@ -1,22 +1,20 @@
-/* ls_misc8.c - misc8 emulator implementation - Logan Seeley 2025 */
+/* emulator.c - misc8 emulator implementation - Logan Seeley 2025 */
 
 
-#include "./misc8.h"
+#include "./emulator.h"
 
 
-misc8_t new_misc8(i32_t arg_c, string *arg_v)
+misc8_t new_misc8(i32_t arg_c, char **arg_v)
 {
-    misc8_t misc8 =
-    {
-        .cycles_to_complete = 0,
-        .program_counter    = 0,
-        .program_loaded     = FALSE
-    };
+    misc8_t misc8;
+    misc8.cycles_to_complete = 0;
+    misc8.program_counter    = 0;
+    misc8.is_program_loaded  = FALSE;
 
     parse_args(&misc8, arg_c, arg_v);
 
-    if (!misc8.program_loaded)
-        ERROR(0x4, "error: no program provided.");
+    if (!misc8.is_program_loaded)
+        ERROR(0x6, "error: no program provided.");
 
     load_program(&misc8);
 
@@ -24,14 +22,14 @@ misc8_t new_misc8(i32_t arg_c, string *arg_v)
 }
 
 
-void parse_args(misc8_t *misc8, i32_t arg_c, string *arg_v)
+void parse_args(misc8_t *misc8, i32_t arg_c, char **arg_v)
 {
-    for (u8_t i = 1; i < arg_c; i++)
+    for (u8_t i = 0; i < arg_c; i++)
     {
         u64_t arg_l = strlen(arg_v[i]);
 
         if ((arg_l < 2) || (arg_v[i][0] != '-'))
-            continue;
+            ERROR(0x1, "error: incomplete argument: '%s'", arg_v[i]);
 
         switch (arg_v[i][1])
         {
@@ -40,50 +38,54 @@ void parse_args(misc8_t *misc8, i32_t arg_c, string *arg_v)
         break;
 
         default:
+            ERROR(0x2, "error: unkown flag '%c'", arg_v[i][1]);
         break;
         }
     }
 }
 
-void parse_program_flag(misc8_t *misc8, string arg)
+void parse_program_flag(misc8_t *misc8, char *arg)
 {
     u64_t program_file_name_l;
 
-    if (misc8->program_loaded)
-        ERROR(0x1, "error: too many programs provided.\n");
+    if (misc8->is_program_loaded)
+        ERROR(0x3, "error: too many programs provided.\n");
 
     if (strlen(arg) <= 2)
-        ERROR(0x2, "error: program argument has no value.\n");
+        ERROR(0x4, "error: program argument has no value.\n");
 
     program_file_name_l = strlen(arg) - 2;
     if (program_file_name_l >= sizeof(misc8->program_file_name))
-        ERROR(0x3, "error: program file name too long.\n");
+        ERROR(0x5, "error: program file name too long.\n");
 
     MEMCPY(misc8->program_file_name, arg + 2, program_file_name_l);
     misc8->program_file_name[program_file_name_l] = 0;
 
-    misc8->program_loaded = TRUE;
+    misc8->is_program_loaded = TRUE;
 }
 
 
 void load_program(misc8_t *misc8)
 {
     u64_t program_file_l;
+    u64_t bytes_read;
 
     FILE *program_file = fopen(misc8->program_file_name, "rb");
     if (program_file == NULL)
-        ERROR(0x5, "error: could not open file.");
+        ERROR(0x7, "error: could not open file.");
 
     fseek(program_file, 0, SEEK_END);
     program_file_l = ftell(program_file);
     if (program_file_l > sizeof(misc8->program))
-        ERROR(0x6, "error: program too large");
+        ERROR(0x8, "error: program too large");
 
     fseek(program_file, 0, SEEK_SET);
 
-    u64_t bytes_read = fread(misc8->program, sizeof(char), program_file_l, program_file);
+    bytes_read = fread(misc8->program, sizeof(char), program_file_l, program_file);
     if (bytes_read != program_file_l)
-        ERROR(0x7, "error: couldn't load entire file.");
+        ERROR(0x9, "error: couldn't load entire file.");
+
+    fclose(program_file);
 }
 
 void run_program(misc8_t *misc8)
@@ -104,7 +106,7 @@ void run_program(misc8_t *misc8)
 
         misc8->program_counter++;
 
-        if (!execute_instruction(misc8, instruction))  /* returns false on error or end of program */
+        if (!execute_instruction(misc8, instruction) || misc8->cycles_to_complete > 2000)  /* returns false on error or end of program */
             break;
 
         /* a-register b-register j-register flags */
@@ -250,7 +252,7 @@ bool_t execute_instruction(misc8_t *misc8, u8_t instruction)
     return TRUE;
 }
 
-void get_instruction_name(misc8_t *misc8, string name)
+void get_instruction_name(misc8_t *misc8, char *name)
 {
     u8_t instruction = misc8->program[misc8->program_counter & ADDR_MASK];
 

@@ -2,36 +2,47 @@ CC 	  = clang
 CDBGC = gcc
 DBG   = gdb
 
-CFLAGS = -Wall -std=c99 -pedantic -D_GNU_SOURCE
+INCDIR = ./include
+CFLAGS = -Wall -std=c99 -pedantic -I$(INCDIR) -D_GNU_SOURCE
 SRCDIR = ./src
 BINDIR = ./bin
 
-EMULATOR_TARGET = $(BINDIR)/misc8_emulator
-EMULATOR_TARDBG = $(BINDIR)/misc8_emulator_dbg
-EMULATOR_SOURCE = $(SRCDIR)/misc8_emulator/main.c
+EMULATOR_TARGET = $(BINDIR)/emulator
+EMULATOR_SOURCE = $(SRCDIR)/emulator/main.c
 
-.PHONY: all emulator run-emulator clean emulator-debug run-emulator-debug
+assembler_sARGET = $(BINDIR)/assembler
+ASSEMBLER_SOURCE = $(SRCDIR)/assembler/main.c
 
-all: $(EMULATOR_TARGET)
+
+
+.PHONY: all emulator run-emulator assembler run-assembler clean
+
+all: $(EMULATOR_TARGET) $(assembler_sARGET)
+
+
 
 $(EMULATOR_TARGET): $(EMULATOR_SOURCE) $(BINDIR)
 	$(CC) $(CFLAGS) $< -o $@;printf "\nSize of EMULATOR_TARGET:\n";size $(EMULATOR_TARGET);echo
-
-$(EMULATOR_TARDBG): $(EMULATOR_SOURCE) $(BINDIR)
-	$(CDBGC) $(CFLAGS) $< -o $@ -g
-
-emulator-debug: $(EMULATOR_TARDBG)
-
-$(BINDIR):
-	mkdir -p $(BINDIR)
 
 emulator: $(EMULATOR_TARGET)
 
 run-emulator: emulator
 	@$(EMULATOR_TARGET) $(ARGS); EXIT_CODE=$$?; printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
 
-run-emulator-debug: emulator-debug
-	@$(DBG) $(EMULATOR_TARDBG) $(ARGS); EXIT_CODE=$$?; printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
+
+
+$(assembler_sARGET): $(ASSEMBLER_SOURCE) $(BINDIR)
+	$(CC) $(CFLAGS) $< -o $@;printf "\nSize of assembler_sARGET:\n";size $(assembler_sARGET);echo
+
+assembler: $(assembler_sARGET)
+
+run-assembler: assembler
+	@$(assembler_sARGET) $(ARGS); EXIT_CODE=$$?; printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
+
+
+
+$(BINDIR):
+	mkdir -p $(BINDIR)
 
 clean:
 	rm -rf $(BINDIR)
