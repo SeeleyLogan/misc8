@@ -4,7 +4,6 @@
 void new_assemble(i32_t arg_c, char **arg_v)
 {
     assembler_s assembler;
-    result_t    chunk_status = 0;
 
 
     u64_t  memory_size;
@@ -16,22 +15,18 @@ void new_assemble(i32_t arg_c, char **arg_v)
     assembler.chunk_arena      = arena_init(memory, memory_size, 4096);
 
     assembler.binary_file      = NULL;
-    assembler.binary           = arena_get_chunk(&assembler.chunk_arena, &chunk_status);
-
     assembler.assembly_file    = NULL;
 
     assembler.has_data_section = FALSE;
 
-    if (chunk_status & LS_CHUNK_ARENA_MEM_FULL)
-        ERROR(0x1, "error: memory full.\n");
-
 
     parse_args(&assembler, arg_c, arg_v);
     parse_tokens(&assembler);
+    parse_symbols(&assembler);
 
     assemble(&assembler);
 
-    parse_symbols(&assembler);
+    write_binary(&assembler);
 
 
     fclose(assembler.binary_file);
@@ -70,9 +65,6 @@ void parse_args(assembler_s *assembler, i32_t arg_c, char **arg_v)
 
     if (assembler->assembly_file == NULL)
         ERROR(0x1, "error: no input file provided.");
-
-    if (assembler->binary_file == NULL)
-        parse_output_flag(assembler, "-o./program.bin");
 }
 
 void parse_input_flag(assembler_s *assembler, char *arg)
@@ -125,7 +117,7 @@ void parse_output_flag(assembler_s *assembler, char *arg)
 
 void parse_tokens(assembler_s *assembler)
 {    
-    char *token = strtok(assembler->assembly, ".\n");
+    char *token = strtok(assembler->assembly, "\n");
 
     do
     {
@@ -142,13 +134,13 @@ void parse_tokens(assembler_s *assembler)
 
         if (strlen(token) == 0)
         {
-            token = strtok(NULL, ".\n");
+            token = strtok(NULL, "\n");
             continue;
         }
 
         compute_token(assembler, token);
 
-        token = strtok(NULL, ".\n");
+        token = strtok(NULL, "\n");
     }
     while (token != NULL);
 
@@ -157,15 +149,15 @@ void parse_tokens(assembler_s *assembler)
 
 void compute_token(assembler_s *assembler, char *token)
 {
-    if (strcmp(token, "main") == 0)
+    if (strcmp(token, ".main") == 0)
         assembler->token_v[assembler->token_c] = (token_s) { .type = MAIN };
-    else if (strcmp(token, "end_main") == 0)
+    else if (strcmp(token, ".end_main") == 0)
         assembler->token_v[assembler->token_c] = (token_s) { .type = END_MAIN };
-    else if (strcmp(token, "data") == 0)
+    else if (strcmp(token, ".data") == 0)
         assembler->token_v[assembler->token_c] = (token_s) { .type = DATA };
-    else if (strcmp(token, "end_data") == 0)
+    else if (strcmp(token, ".end_data") == 0)
         assembler->token_v[assembler->token_c] = (token_s) { .type = END_DATA };
-    else if (token[0] == '$')
+    else if (token[0] == '*')
         assembler->token_v[assembler->token_c] = (token_s) { .type = SYMBOL, .metadata = &(token[1]) };
     else if (strcmp(token, "nop") == 0)
         assembler->token_v[assembler->token_c] = (token_s) { .type = NOP };
@@ -173,9 +165,10 @@ void compute_token(assembler_s *assembler, char *token)
         assembler->token_v[assembler->token_c] = (token_s) { .type = ADD };
     else if (strcmp(token, "sub") == 0)
         assembler->token_v[assembler->token_c] = (token_s) { .type = SUB };
-    else if (strncmp(token, "load", 4) == 0)
+    else if (strncmp(token, "load", 4) == 0 && strncmp(token, "loadj", 5) != 0)
     {
-        char *symbol = token;
+        char *symbol = token + 4;
+
         while (isspace(*symbol))
             symbol++;
 
@@ -183,7 +176,7 @@ void compute_token(assembler_s *assembler, char *token)
     }
     else if (strncmp(token, "loadj", 5) == 0)
     {
-        char *symbol = token;
+        char *symbol = token + 5;
         while (isspace(*symbol))
             symbol++;
         
@@ -219,23 +212,27 @@ void compute_token(assembler_s *assembler, char *token)
 
 void verify_tokens(assembler_s *assembler)
 {
-    result_t status;
+    result_t status = 0;
 
-    bool_t in_main_section = FALSE;
-    bool_t in_data_section = FALSE;
-
-    section_s section;
+    bool_t in_main_section  = FALSE;
+    bool_t in_data_section  = FALSE;
+    bool_t has_main_section = FALSE;
+    bool_t has_data_section = FALSE;
 
     for (int i = 0; i < assembler->token_c; i++)
-        switch (assembler->token_v[assembler->token_c].type)
+    {
+        switch (assembler->token_v[i].type)
         {
         case MAIN:
             if (in_main_section || in_data_section)
                 ERROR(0x1, "error: main section inside another section.\n");
+            if (has_main_section)
+                ERROR(0x1, "error: more than one main section.\n");
 
-            in_main_section = TRUE;
-            section.body    = arena_get_chunk(&assembler->chunk_arena, &status);
-            section.body_l  = 0;
+            in_main_section  = TRUE;
+            has_main_section = TRUE;
+            assembler->main.body   = arena_get_chunk(&assembler->chunk_arena, &status);
+            assembler->main.body_l = 0;
         break;
 
         case END_MAIN:
@@ -248,8 +245,14 @@ void verify_tokens(assembler_s *assembler)
         case DATA:
             if (in_main_section || in_data_section)
                 ERROR(0x1, "error: data section inside another section.\n");
+            if (has_data_section)
+                ERROR(0x1, "error: more than one data section.\n");
 
-            in_main_section = TRUE;
+            in_data_section  = TRUE;
+            has_data_section = TRUE;
+            assembler->data.body        = arena_get_chunk(&assembler->chunk_arena, &status);
+            assembler->data.body_l      = 0;
+            assembler->has_data_section = TRUE;
         break;
 
         case END_DATA:
@@ -260,32 +263,257 @@ void verify_tokens(assembler_s *assembler)
         break;
 
         default:
-        break;
+            if (!in_main_section && !in_data_section)
+                ERROR(0x1, "error: symbol outside of section.\n");
         }
-}
+    }
 
+    if (!has_main_section)
+        ERROR(0x1, "error: no main section exists.\n");
 
-void assemble(assembler_s *assembler)
-{
-    section_s current_section;
-
-    for (int i = 0; i < assembler->token_c; i++)
-        switch (assembler->token_v[i].type)
-        {
-        
-        }
+    if (status & LS_CHUNK_ARENA_MEM_FULL)
+        ERROR(0x1, "error: out of memory.\n");
 }
 
 
 void parse_symbols(assembler_s *assembler)
 {
-    for (int i = 0; i < assembler->token_c; i++)
+    /* token verification validates
+     * this will never be written to
+     * before a current section is decided */
+    section_s *current_section;
+    symbol_s  *current_symbol;
+    u32_t      current_section_offset;
+
+    u16_t     byte_c = 0;
+
+    result_t status = 0;
+
+    for (u32_t i = 0; i < assembler->token_c; i++)
+        switch (assembler->token_v[i].type)
+        {
+            case MAIN:
+                current_section = &assembler->main;
+
+                current_section->symbol_v = arena_get_chunk(&assembler->chunk_arena, &status);
+                if (status & LS_CHUNK_ARENA_MEM_FULL)
+                    ERROR(0x1, "error: out of memory.\n");
+
+                current_section->symbol_c = 0;
+                current_section_offset    = byte_c;
+            break;
+
+            case DATA:
+                current_section = &assembler->data;
+
+                current_section->symbol_v = arena_get_chunk(&assembler->chunk_arena, &status);
+                if (status & LS_CHUNK_ARENA_MEM_FULL)
+                    ERROR(0x1, "error: out of memory.\n");
+
+                current_section->symbol_c = 0;
+                current_section_offset    = byte_c;
+            break;
+
+            case SYMBOL:
+                current_symbol         = &current_section->symbol_v[current_section->symbol_c];
+                current_symbol->name   = assembler->token_v[i].metadata;
+                current_symbol->name_z = strlen(current_symbol->name);
+                current_symbol->value  = byte_c - current_section_offset;
+                
+                current_section->symbol_c++;
+            break;
+
+            case VALUE:
+                if (assembler->token_v[i].metadata[0] == '&')  /* value is symbol */
+                    byte_c += 2;  /* 2 is size of symbol */
+                else
+                    byte_c++;
+            break;
+
+            case LOAD:
+                byte_c += 2;
+            break;
+
+            case LOADJ:
+                byte_c += 3;
+            break;
+
+            /* calculating section size here is a cheat, I should defer it to another function */
+            case END_MAIN:
+                current_section->body_l = byte_c - current_section_offset;
+            break;
+
+            case END_DATA:
+                current_section->body_l = byte_c - current_section_offset;
+            break;
+
+            default:
+                byte_c ++;
+        }
+}
+
+u16_t get_symbol_value(assembler_s *assembler, section_s *section, char *symbol_name, result_t *status)
+{
+    section_s *other_section;
+    u16_t      value_offset;
+
+    if (section == &assembler->main)
+        value_offset = 0;
+    else
+        value_offset = 0x1000 - assembler->data.body_l;
+
+    for (u16_t i = 0; i < section->symbol_c; i++)
     {
-        printf("%d: ", assembler->token_v[i].type);
+        if (strcmp(section->symbol_v[i].name, symbol_name) == 0)
+            return value_offset + section->symbol_v[i].value;
+    }
 
-        if (assembler->token_v[i].type == SYMBOL)
-            printf("%s", assembler->token_v[i].metadata);
+    if (section == &assembler->main && assembler->has_data_section)
+    {
+        other_section = &assembler->data;
+        value_offset  = 0x1000 - assembler->data.body_l;
+    }
+    else
+    {
+        other_section = &assembler->main;
+        value_offset  = 0;
+    }
 
-        printf("\n");
+    /* check other section if symbol was not found in first section */
+    for (u16_t i = 0; i < other_section->symbol_c; i++)
+    {
+        if (strcmp(other_section->symbol_v[i].name, symbol_name) == 0)
+            return value_offset + other_section->symbol_v[i].value;
+    }
+
+    (*status) = SYMBOL_NOT_FOUND;
+    return FAIL;
+}
+
+void assemble(assembler_s *assembler)
+{
+    result_t status = 0;
+
+    /* token verification validates
+     * this will never be written to
+     * before a current section is decided */
+    section_s *current_section;
+    
+    u16_t symbol_value;
+    u16_t byte_value;
+
+    u16_t byte_c;
+
+    /* todo: separate below into function to help readability and code-quality */
+    for (u32_t i = 0; i < assembler->token_c; i++)
+    {
+        switch (assembler->token_v[i].type)
+        {
+            case MAIN:
+                current_section = &assembler->main;
+                byte_c          = 0;
+            break;
+
+            case DATA:
+                current_section = &assembler->data;
+                byte_c          = 0;
+            break;
+
+            case VALUE:
+                if (assembler->token_v[i].metadata[0] == '&')  /* value is symbol */
+                {
+                    symbol_value = get_symbol_value(assembler, current_section, &(assembler->token_v[i].metadata[1]), &status);
+                    if (status == SYMBOL_NOT_FOUND)
+                        ERROR(0x1, "error: symbol '%s' does not exist.\n", &(assembler->token_v[i].metadata[1]));
+
+                    current_section->body[byte_c]     = CAST(symbol_value & 0xFF, u8_t);
+                    current_section->body[byte_c + 1] = symbol_value >> 8;
+
+                    byte_c += 2;  /* 2 is size of symbol */
+                }
+                else
+                {
+                    byte_value = parse_value(assembler->token_v[i].metadata);
+                    
+                    current_section->body[byte_c] = byte_value;
+
+                    byte_c++;
+                }
+            break;
+
+            case LOAD:
+                byte_value = parse_value(assembler->token_v[i].metadata);
+
+                current_section->body[byte_c]     = LOAD;
+                current_section->body[byte_c + 1] = byte_value;
+
+                byte_c += 2;
+            break;
+
+            case LOADJ:
+                symbol_value = get_symbol_value(assembler, current_section, &(assembler->token_v[i].metadata[1]), &status);
+                if (status == SYMBOL_NOT_FOUND)
+                    ERROR(0x1, "error: symbol '%s' does not exist.\n", &(assembler->token_v[i].metadata[1]));
+
+                current_section->body[byte_c]     = LOADJ;
+                current_section->body[byte_c + 1] = CAST(symbol_value & 0xFF, u8_t);
+                current_section->body[byte_c + 2] = symbol_value >> 8;
+
+                byte_c += 3;
+            break;
+
+            case SYMBOL:
+            case END_MAIN:
+            case END_DATA:
+            break;
+
+            default:
+                current_section->body[byte_c] = assembler->token_v[i].type;
+                byte_c++;
+        }
     }
 }
+
+void write_binary(assembler_s *assembler)
+{
+    fwrite(assembler->main.body, 1, assembler->main.body_l, assembler->binary_file);
+
+    if (!assembler->has_data_section)
+        return;
+
+    if (fseek(assembler->binary_file, 0x1000 - assembler->data.body_l, SEEK_SET) != 0)
+        ERROR(0x1, "error: could not write file successfully.\n");
+    
+    fwrite(assembler->data.body, 1, assembler->data.body_l, assembler->binary_file);
+}
+
+
+u16_t parse_value(char *string_value)
+{
+    if (string_value[0] == 'x')
+        return CAST(strtol(&(string_value[1]), NULL, 16), u16_t);
+    else if (string_value[0] == 'b')
+        return CAST(strtol(&(string_value[1]), NULL, 2), u16_t);
+    else if (string_value[0] == 'o')
+        return CAST(strtol(&(string_value[1]), NULL, 8), u16_t);
+
+    return CAST(strtol(string_value, NULL, 10), u16_t);
+}
+
+
+/*
+ * Copyright (C) 2025  Logan Seeley
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */

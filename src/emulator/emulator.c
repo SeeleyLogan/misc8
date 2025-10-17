@@ -33,7 +33,7 @@ void parse_args(misc8_t *misc8, i32_t arg_c, char **arg_v)
 
         switch (arg_v[i][1])
         {
-        case 'p':
+        case 'i':
             parse_program_flag(misc8, arg_v[i]);
         break;
 

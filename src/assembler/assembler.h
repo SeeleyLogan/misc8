@@ -15,30 +15,34 @@
 #include <ls_chunk_arena.h>
 
 
+#define SYMBOL_NOT_FOUND    1
+
+
+/* instruction enum values correspond to instruction op-code */
 typedef enum
 {
-    MAIN,
-    END_MAIN,
-    DATA,
-    END_DATA,
-    SYMBOL,
-    VALUE,
-    NOP,
-    ADD,
-    SUB,
-    LOAD,
-    LOADJ,
-    FETCH,
-    FETCHJ,
-    WRITE,
-    COPYAB,
-    COPYBA,
-    JMP,
-    JC,
-    JZ,
-    DWRITEI,
-    DWRITED,
-    HALT
+    NOP      = 0x0,
+    ADD      = 0x1,
+    SUB      = 0x2,
+    LOAD     = 0x3,
+    LOADJ    = 0x4,
+    FETCH    = 0x5,
+    FETCHJ   = 0x6,
+    WRITE    = 0x7,
+    COPYAB   = 0x8,
+    COPYBA   = 0x9,
+    JMP      = 0xA,
+    JC       = 0xB,
+    JZ       = 0xC,
+    DWRITEI  = 0xD,
+    DWRITED  = 0xE,
+    HALT     = 0xF,
+    MAIN     = 0x10,
+    END_MAIN = 0x11,
+    DATA     = 0x12,
+    END_DATA = 0x13,
+    SYMBOL   = 0x14,
+    VALUE    = 0x15,
 }
 token_e;
 
@@ -52,10 +56,10 @@ token_s;
 /* try to keep size at 16 bytes, aligns well with chunk size */
 typedef struct
 {
-    char  *symbol_name;
-    u32_t  name_size;
+    char  *name;
+    u32_t  name_z;
 
-    u32_t  section_offset;
+    u32_t  value;
 }
 symbol_s;
 
@@ -74,7 +78,6 @@ typedef struct
     arena_s    chunk_arena;
 
     FILE      *binary_file;
-    u8_t      *binary;
 
     FILE      *assembly_file;
     char      *assembly;
@@ -90,19 +93,24 @@ typedef struct
 assembler_s;
 
 
-void new_assemble     (i32_t        arg_c,        char  **arg_v);
+void  new_assemble     (i32_t        arg_c,        char     **arg_v);
 
-void parse_args       (assembler_s *assembler,    i32_t   arg_c,  char **arg_v);
-void parse_input_flag (assembler_s *assembler,    char   *arg);
-void parse_output_flag(assembler_s *assembler,    char   *arg);
+void  parse_args       (assembler_s *assembler,    i32_t      arg_c,        char     **arg_v);
+void  parse_input_flag (assembler_s *assembler,    char      *arg);
+void  parse_output_flag(assembler_s *assembler,    char      *arg);
 
-void parse_tokens     (assembler_s *assembler);
-void compute_token    (assembler_s *assembler,    char   *token);
-void verify_tokens    (assembler_s *assembler);
+void  parse_tokens     (assembler_s *assembler);
+void  compute_token    (assembler_s *assembler,    char      *token);
+void  verify_tokens    (assembler_s *assembler);
 
-void assemble         (assembler_s *assembler);
+void  parse_symbols    (assembler_s *assembler);
+u16_t get_symbol_value (assembler_s *assembler,    section_s *section,      char   *symbol_name,     result_t *status);
 
-void parse_symbols    (assembler_s *assembler);
+void  assemble         (assembler_s *assembler);
+void  write_binary     (assembler_s *assembler);
+
+u16_t parse_value      (char *string_value);
+
 
 #include "./assembler.c"
 
