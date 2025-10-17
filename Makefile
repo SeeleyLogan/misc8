@@ -7,10 +7,10 @@ CFLAGS = -Wall -std=c99 -pedantic -I$(INCDIR) -D_GNU_SOURCE
 SRCDIR = ./src
 BINDIR = ./bin
 
-EMULATOR_TARGET = $(BINDIR)/emulator
+EMULATOR_TARGET = $(BINDIR)/misc8_emulator
 EMULATOR_SOURCE = $(SRCDIR)/emulator/main.c
 
-assembler_sARGET = $(BINDIR)/assembler
+assembler_sARGET = $(BINDIR)/misc8_assembler
 ASSEMBLER_SOURCE = $(SRCDIR)/assembler/main.c
 
 

@@ -2,9 +2,9 @@
 
 ![MISC8 after being powered, no program executed](./images/misc8_startup.jpg "MISC8")
 
-This project currently includes an emulator for my homebrew breadboard computer.
+This project currently includes an emulator and assembler for my homebrew breadboard computer.
 
-Future programs will include an assembler and a compiler.
+There will eventually be a compiler, for now an assembler is provided.
 
 I also plan to extend the emulator by adding an emulator for the 1602A LCD, this way `dwritei` and `dwrited` can be debugged.
 
@@ -25,34 +25,54 @@ More information can be found in `./docs`.
 
 ## Compiling
 
-For a quick compile-all: simply run `make` and all binaries will be placed in `./bin`
+For a quick compile-all: run `make` and all binaries will be placed in `./bin`
 
 If you want to only compile the emulator, `make emulator` will do the trick.
 
 ## Usage
 
-### Emulator
+### Assembler
 
-After compiling, a binary with the name `misc8_emulator` should appear in the `./bin` folder. You can either call this binary directly or by using `make run-emulator`.
+The assembler takes two arguments: the input assembly file and the output binary file (program file).
 
-The emulator takes one argument: the program file.
+The input file is a required argument. Omitting the output argument will write the binary to `./program.bin`.
 
-The program file is where you write the MISC8 program to. It should be a binary file, not a text one.
+I recommend looking at the `./examples/` to get an idea on how to create programs. There's also `./docs` you can read which will help as well.
 
-I recommend looking at the `./examples/emulator/` to get an idea on how to create programs. There's also `./docs` you can read which will help as well.
-
-You can pass a program file to the MISC8 by using the `-p` flag.
+You can pass an assembly file to the MISC8 assembler by using the `-i` flag.
 
 > Example: \
-> `misc8_emulator -p./program.bin`
+> `misc8_assembler -i./program.asm -o./program.bin`
 
 Or if you're using `make`
 
 > Example: \
-> `make run-emulator "ARGS=-p./program.bin`
+> `make run-emulator "ARGS=-i./program.asm -o./program.bin`
+
+### Emulator
+
+The emulator takes one argument: the program file.
+
+The program file is where you write the MISC8 program to. It should be a binary file, not a text one. I don't recommend writing them directly, use the assembler.
+
+You can pass a program file to the MISC8 emulator by using the `-i` flag.
+
+> Example: \
+> `misc8_emulator -i./program.bin`
+
+Or if you're using `make`
+
+> Example: \
+> `make run-emulator "ARGS=-i./program.bin`
 
 ## Examples
 
 I try to demonstrate every feature of the MISC8 and its associated programs. I add these examples to `./examples`.
 
 Feel free to examples of your own and contribute them back, I love seeing what other people make!
+
+## Going Forward
+
+As stated before, I plan on writing a compiler for my computer. However, this project was slightly rushed and the code-quality isn't up to my standards. Therefore, I'll be re-writing the programs at at later date.
+
+I also plan on adding extensive documentation to `./docs` in the near future. Starting with how to program for the assembler.

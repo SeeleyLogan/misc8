@@ -1,5 +1,4 @@
 ; test_each_instruction.asm
-; test_each_instruction.asm
 
 .main
     nop
