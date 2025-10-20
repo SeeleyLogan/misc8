@@ -144,7 +144,7 @@ bool_t execute_instruction(misc8_t *misc8, u8_t instruction)
     break;
 
     case SUB:
-        if ((CAST(misc8->a_register, u64_t) + CAST(~misc8->b_register + 1, u64_t)) > 255)
+        if (CAST(CAST(misc8->a_register, u8_t) + CAST(~misc8->a_register + 1, u8_t), u16_t) > 255)
             misc8->carry_flag = TRUE;
         else
             misc8->carry_flag = FALSE;
