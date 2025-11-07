@@ -271,6 +271,9 @@ void verify_tokens(assembler_s *assembler)
     if (!has_main_section)
         ERROR(0x1, "error: no main section exists.\n");
 
+    if (in_main_section == TRUE || in_data_section == TRUE)
+        ERROR(0x1, "error: non-ending section");
+
     if (status & LS_CHUNK_ARENA_MEM_FULL)
         ERROR(0x1, "error: out of memory.\n");
 }
