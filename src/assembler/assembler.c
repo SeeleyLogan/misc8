@@ -9,16 +9,15 @@ void new_assemble(i32_t arg_c, char **arg_v)
     u64_t  memory_size;
     void_p memory = vmalloc(&memory_size);
     if (memory == NULL)
-        ERROR(0x1, "error: could not allocate memory.\n");
+        ERROR_EXIT(0x1, "error: could not allocate memory.\n");
 
 
-    assembler.chunk_arena      = arena_init(memory, memory_size, 4096);
+    assembler.chunk_arena      = arena_init(memory, memory_size);
 
     assembler.binary_file      = NULL;
     assembler.assembly_file    = NULL;
 
     assembler.has_data_section = FALSE;
-
 
     parse_args(&assembler, arg_c, arg_v);
     parse_tokens(&assembler);
@@ -45,8 +44,8 @@ void parse_args(assembler_s *assembler, i32_t arg_c, char **arg_v)
         u64_t arg_l = strlen(arg_v[i]);
 
         if ((arg_l < 2) || (arg_v[i][0] != '-'))
-            ERROR(0x1, "error: incomplete argument: '%s'\n", arg_v[i]);
-
+            ERROR_EXIT(0x1, "error: incomplete argument: '%s'\n", arg_v[i]);
+        
         switch (arg_v[i][1])
         {
         case 'i':
@@ -58,13 +57,13 @@ void parse_args(assembler_s *assembler, i32_t arg_c, char **arg_v)
         break;
 
         default:
-            ERROR(0x1, "error: unkown flag '%c'\n", arg_v[i][1]);
+            ERROR_EXIT(0x1, "error: unkown flag '%c'\n", arg_v[i][1]);
         break;
         }
     }
 
     if (assembler->assembly_file == NULL)
-        ERROR(0x1, "error: no input file provided.");
+        ERROR_EXIT(0x1, "error: no input file provided.");
 }
 
 void parse_input_flag(assembler_s *assembler, char *arg)
@@ -74,28 +73,30 @@ void parse_input_flag(assembler_s *assembler, char *arg)
     u64_t read_z;
 
     if (assembler->assembly_file != NULL)
-        ERROR(0x1, "error: too many assembly files provided.\n");
+        ERROR_EXIT(0x1, "error: too many assembly files provided.\n");
 
     if (strlen(arg) <= 2)
-        ERROR(0x1, "error: program assembly has no value.\n");
+        ERROR_EXIT(0x1, "error: program assembly has no value.\n");
 
     assembler->assembly_file = fopen(&(arg[2]), "rb");
     if (assembler->assembly_file == NULL)
-        ERROR(0x1, "error: could not open assembly file.\n");
+        ERROR_EXIT(0x1, "error: could not open assembly file.\n");
 
     assembler->assembly = vmalloc(&mem_z);
     if (assembler->assembly == NULL)
-        ERROR(0x1, "error: could not allocate memory for input file.\n");
+        ERROR_EXIT(0x1, "error: could not allocate memory for input file.\n");
 
     fseek(assembler->assembly_file, 0, SEEK_END);
     file_z = ftell(assembler->assembly_file);
     rewind(assembler->assembly_file);
 
+    pcommit_range(assembler->assembly, 0, file_z);
     read_z = fread(assembler->assembly, 1, file_z, assembler->assembly_file);
+    
     if (read_z != file_z)
-        ERROR(0x1, "error: could not load input file to memory.\n");
+        ERROR_EXIT(0x1, "error: could not load input file to memory.\n");
     assembler->assembly[read_z] = '\0';
-
+    
     assembler->token_v    = CAST(LS_ROUND_UP_TO(CAST(assembler->assembly, u64_t) + read_z + 1, sizeof(token_s)), token_s *);
     assembler->max_tokens = (CAST(assembler->token_v, u64_t) - CAST(assembler->assembly, u64_t)) / sizeof(token_s); 
     assembler->token_c    = 0;
@@ -104,14 +105,14 @@ void parse_input_flag(assembler_s *assembler, char *arg)
 void parse_output_flag(assembler_s *assembler, char *arg)
 {
     if (assembler->binary_file != NULL)
-        ERROR(0x1, "error: too many output files provided.\n");
+        ERROR_EXIT(0x1, "error: too many output files provided.\n");
 
     if (strlen(arg) <= 2)
-        ERROR(0x1, "error: output argument has no value.\n");
+        ERROR_EXIT(0x1, "error: output argument has no value.\n");
 
     assembler->binary_file = fopen(&(arg[2]), "w");
     if (assembler->binary_file == NULL)
-        ERROR(0x1, "error: could not create output file.\n");
+        ERROR_EXIT(0x1, "error: could not create output file.\n");
 }
 
 
@@ -212,70 +213,68 @@ void compute_token(assembler_s *assembler, char *token)
 
 void verify_tokens(assembler_s *assembler)
 {
-    result_t status = 0;
-
     bool_t in_main_section  = FALSE;
     bool_t in_data_section  = FALSE;
     bool_t has_main_section = FALSE;
     bool_t has_data_section = FALSE;
 
-    for (int i = 0; i < assembler->token_c; i++)
+    for (u64_t i = 0; i < assembler->token_c; i++)
     {
         switch (assembler->token_v[i].type)
         {
         case MAIN:
             if (in_main_section || in_data_section)
-                ERROR(0x1, "error: main section inside another section.\n");
+                ERROR_EXIT(0x1, "error: main section inside another section.\n");
             if (has_main_section)
-                ERROR(0x1, "error: more than one main section.\n");
+                ERROR_EXIT(0x1, "error: more than one main section.\n");
 
             in_main_section  = TRUE;
             has_main_section = TRUE;
-            assembler->main.body   = arena_get_chunk(&assembler->chunk_arena, &status);
+            assembler->main.body   = arena_get_chunk(&assembler->chunk_arena);
             assembler->main.body_l = 0;
         break;
 
         case END_MAIN:
             if (!in_main_section)
-                ERROR(0x1, "error: ending non-main section.\n");
+                ERROR_EXIT(0x1, "error: ending non-main section.\n");
 
             in_main_section = FALSE;
         break;
 
         case DATA:
             if (in_main_section || in_data_section)
-                ERROR(0x1, "error: data section inside another section.\n");
+                ERROR_EXIT(0x1, "error: data section inside another section.\n");
             if (has_data_section)
-                ERROR(0x1, "error: more than one data section.\n");
+                ERROR_EXIT(0x1, "error: more than one data section.\n");
 
             in_data_section  = TRUE;
             has_data_section = TRUE;
-            assembler->data.body        = arena_get_chunk(&assembler->chunk_arena, &status);
+            assembler->data.body        = arena_get_chunk(&assembler->chunk_arena);
             assembler->data.body_l      = 0;
             assembler->has_data_section = TRUE;
         break;
 
         case END_DATA:
             if (!in_data_section)
-                ERROR(0x1, "error: ending non-data section.\n");
+                ERROR_EXIT(0x1, "error: ending non-data section.\n");
 
             in_data_section = FALSE;
         break;
 
         default:
             if (!in_main_section && !in_data_section)
-                ERROR(0x1, "error: symbol outside of section.\n");
+                ERROR_EXIT(0x1, "error: symbol outside of section.\n");
         }
     }
 
     if (!has_main_section)
-        ERROR(0x1, "error: no main section exists.\n");
+        ERROR_EXIT(0x1, "error: no main section exists.\n");
 
     if (in_main_section == TRUE || in_data_section == TRUE)
-        ERROR(0x1, "error: non-ending section");
+        ERROR_EXIT(0x1, "error: non-ending section");
 
-    if (status & LS_CHUNK_ARENA_MEM_FULL)
-        ERROR(0x1, "error: out of memory.\n");
+    if ((assembler->main.body == NULL) || (assembler->data.body == NULL))
+        ERROR_EXIT(0x1, "error: unexpected issue allocating memory.\n");
 }
 
 
@@ -290,17 +289,15 @@ void parse_symbols(assembler_s *assembler)
 
     u16_t     byte_c = 0;
 
-    result_t status = 0;
-
     for (u32_t i = 0; i < assembler->token_c; i++)
         switch (assembler->token_v[i].type)
         {
             case MAIN:
                 current_section = &assembler->main;
 
-                current_section->symbol_v = arena_get_chunk(&assembler->chunk_arena, &status);
-                if (status & LS_CHUNK_ARENA_MEM_FULL)
-                    ERROR(0x1, "error: out of memory.\n");
+                current_section->symbol_v = arena_get_chunk(&assembler->chunk_arena);
+                if (current_section->symbol_v == NULL)
+                    ERROR_EXIT(0x1, "error: unexpected issue allocating memory.\n");
 
                 current_section->symbol_c = 0;
                 current_section_offset    = byte_c;
@@ -309,9 +306,9 @@ void parse_symbols(assembler_s *assembler)
             case DATA:
                 current_section = &assembler->data;
 
-                current_section->symbol_v = arena_get_chunk(&assembler->chunk_arena, &status);
-                if (status & LS_CHUNK_ARENA_MEM_FULL)
-                    ERROR(0x1, "error: out of memory.\n");
+                current_section->symbol_v = arena_get_chunk(&assembler->chunk_arena);
+                if (current_section->symbol_v == NULL)
+                    ERROR_EXIT(0x1, "error: unexpect issue allocating memory.\n");
 
                 current_section->symbol_c = 0;
                 current_section_offset    = byte_c;
@@ -351,7 +348,7 @@ void parse_symbols(assembler_s *assembler)
             break;
 
             default:
-                byte_c ++;
+                byte_c++;
         }
 }
 
@@ -427,7 +424,7 @@ void assemble(assembler_s *assembler)
                 {
                     symbol_value = get_symbol_value(assembler, current_section, &(assembler->token_v[i].metadata[1]), &status);
                     if (status == SYMBOL_NOT_FOUND)
-                        ERROR(0x1, "error: symbol '%s' does not exist.\n", &(assembler->token_v[i].metadata[1]));
+                        ERROR_EXIT(0x1, "error: symbol '%s' does not exist.\n", &(assembler->token_v[i].metadata[1]));
 
                     current_section->body[byte_c]     = CAST(symbol_value & 0xFF, u8_t);
                     current_section->body[byte_c + 1] = symbol_value >> 8;
@@ -456,7 +453,7 @@ void assemble(assembler_s *assembler)
             case LOADJ:
                 symbol_value = get_symbol_value(assembler, current_section, &(assembler->token_v[i].metadata[1]), &status);
                 if (status == SYMBOL_NOT_FOUND)
-                    ERROR(0x1, "error: symbol '%s' does not exist.\n", &(assembler->token_v[i].metadata[1]));
+                    ERROR_EXIT(0x1, "error: symbol '%s' does not exist.\n", &(assembler->token_v[i].metadata[1]));
 
                 current_section->body[byte_c]     = LOADJ;
                 current_section->body[byte_c + 1] = CAST(symbol_value & 0xFF, u8_t);
@@ -485,7 +482,7 @@ void write_binary(assembler_s *assembler)
         return;
 
     if (fseek(assembler->binary_file, 0x1000 - assembler->data.body_l, SEEK_SET) != 0)
-        ERROR(0x1, "error: could not write file successfully.\n");
+        ERROR_EXIT(0x1, "error: could not write file successfully.\n");
     
     fwrite(assembler->data.body, 1, assembler->data.body_l, assembler->binary_file);
 }

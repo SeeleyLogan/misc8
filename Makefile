@@ -1,49 +1,71 @@
-CC 	  = clang
-CDBGC = gcc
-DBG   = gdb
+DEBUG ?= 0
+INFO  ?= 0
+OPT   ?= O0
+STD   ?= c99
+EXTRA ?= 
 
-INCDIR = ./include
-CFLAGS = -Wall -std=c99 -pedantic -I$(INCDIR) -D_GNU_SOURCE
+CC 	  = gcc
+
+ifeq ($(OS), Windows_NT)
+    SHARED_FLAGS = -shared
+	SHARED_EXT   = .dll
+	EXE_EXT		 = .exe
+else ifeq ($(shell uname -s), Linux)
+    SHARED_FLAGS = -shared -fPIC
+	SHARED_EXT   = .so
+	EXE_EXT		 =
+endif
+
+INCDIR = ./inc
+CFLAGS = -I$(INCDIR) -Wall -Wextra -std=$(STD) -pedantic -D_GNU_SOURCE -$(OPT) $(EXTRA)
 SRCDIR = ./src
 BINDIR = ./bin
 
-EMULATOR_TARGET = $(BINDIR)/misc8_emulator
+EMULATOR_TARGET = $(BINDIR)/misc8_emulator$(EXE_EXT)
 EMULATOR_SOURCE = $(SRCDIR)/emulator/main.c
 
-assembler_sARGET = $(BINDIR)/misc8_assembler
+ASSEMBLER_TARGET = $(BINDIR)/misc8_assembler$(EXE_EXT)
 ASSEMBLER_SOURCE = $(SRCDIR)/assembler/main.c
 
+ifeq ($(DEBUG), 1)
+	CFLAGS += -g -DDEBUG
+endif
 
+.PHONY: all run clean lib
 
-.PHONY: all emulator run-emulator assembler run-assembler clean
-
-all: $(EMULATOR_TARGET) $(assembler_sARGET)
-
-
-
-$(EMULATOR_TARGET): $(EMULATOR_SOURCE) $(BINDIR)
-	$(CC) $(CFLAGS) $< -o $@;printf "\nSize of EMULATOR_TARGET:\n";size $(EMULATOR_TARGET);echo
+all: $(EMULATOR_TARGET) $(ASSEMBLER_TARGET)
 
 emulator: $(EMULATOR_TARGET)
 
+$(EMULATOR_TARGET): $(EMULATOR_SOURCE) $(BINDIR)
+	@printf "\nCompiling Main File\n"
+	$(CC) $(CFLAGS) $< -o $@
+	@printf "\nSize of target:\n"
+	@size $(EMULATOR_TARGET)
+	@echo
+
 run-emulator: emulator
-	@$(EMULATOR_TARGET) $(ARGS); EXIT_CODE=$$?; printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
+	$(EMULATOR_TARGET) $(ARGS)
+	@EXIT_CODE=$$?
+	@printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
 
+assembler: $(ASSEMBLER_TARGET)
 
-
-$(assembler_sARGET): $(ASSEMBLER_SOURCE) $(BINDIR)
-	$(CC) $(CFLAGS) $< -o $@;printf "\nSize of assembler_sARGET:\n";size $(assembler_sARGET);echo
-
-assembler: $(assembler_sARGET)
+$(ASSEMBLER_TARGET): $(ASSEMBLER_SOURCE) $(BINDIR)
+	@printf "\nCompiling Main File\n"
+	$(CC) $(CFLAGS) $< -o $@
+	@printf "\nSize of target:\n"
+	@size $(ASSEMBLER_TARGET)
+	@echo
 
 run-assembler: assembler
-	@$(assembler_sARGET) $(ARGS); EXIT_CODE=$$?; printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
-
-
+	$(ASSEMBLER_TARGET) $(ARGS)
+	@EXIT_CODE=$$?
+	@printf "\n\nEXIT CODE: 0x%x\n" $$EXIT_CODE
 
 $(BINDIR):
 	mkdir -p $(BINDIR)
 
 clean:
 	rm -rf $(BINDIR)
-	$(MAKE) all
+

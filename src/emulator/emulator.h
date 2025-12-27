@@ -6,6 +6,7 @@
 
 
 #include <ls_macros.h>
+#include <stdio.h>
 
 
 typedef struct misc8_s

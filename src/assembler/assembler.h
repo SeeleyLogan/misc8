@@ -11,8 +11,15 @@
 #include <ls_macros.h>
 
 #include <ls_valloc.h>
-#define _ls_chunk_arena_alloca_commit_range ls_valloc_pcommit_range 
+#define vmalloc ls_valloc_vmalloc
+#define vfree ls_valloc_vfree
+#define pcommit_range   ls_valloc_pcommit_range
+#define ls_chunk_arena_alloca_commit_range_ pcommit_range 
 #include <ls_chunk_arena.h>
+#define arena_s         ls_chunk_arena_s
+#define arena_init      ls_chunk_arena_init
+#define arena_fini      ls_chunk_arena_fini
+#define arena_get_chunk ls_chunk_arena_get_chunk
 
 
 #define SYMBOL_NOT_FOUND    1

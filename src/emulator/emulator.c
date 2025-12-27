@@ -14,7 +14,7 @@ misc8_t new_misc8(i32_t arg_c, char **arg_v)
     parse_args(&misc8, arg_c, arg_v);
 
     if (!misc8.is_program_loaded)
-        ERROR(0x6, "error: no program provided.");
+        ERROR_EXIT(0x6, "error: no program provided.");
 
     load_program(&misc8);
 
@@ -29,7 +29,7 @@ void parse_args(misc8_t *misc8, i32_t arg_c, char **arg_v)
         u64_t arg_l = strlen(arg_v[i]);
 
         if ((arg_l < 2) || (arg_v[i][0] != '-'))
-            ERROR(0x1, "error: incomplete argument: '%s'", arg_v[i]);
+            ERROR_EXIT(0x1, "error: incomplete argument: '%s'", arg_v[i]);
 
         switch (arg_v[i][1])
         {
@@ -38,7 +38,7 @@ void parse_args(misc8_t *misc8, i32_t arg_c, char **arg_v)
         break;
 
         default:
-            ERROR(0x2, "error: unkown flag '%c'", arg_v[i][1]);
+            ERROR_EXIT(0x2, "error: unkown flag '%c'", arg_v[i][1]);
         break;
         }
     }
@@ -49,14 +49,14 @@ void parse_program_flag(misc8_t *misc8, char *arg)
     u64_t program_file_name_l;
 
     if (misc8->is_program_loaded)
-        ERROR(0x3, "error: too many programs provided.\n");
+        ERROR_EXIT(0x3, "error: too many programs provided.\n");
 
     if (strlen(arg) <= 2)
-        ERROR(0x4, "error: program argument has no value.\n");
+        ERROR_EXIT(0x4, "error: program argument has no value.\n");
 
     program_file_name_l = strlen(arg) - 2;
     if (program_file_name_l >= sizeof(misc8->program_file_name))
-        ERROR(0x5, "error: program file name too long.\n");
+        ERROR_EXIT(0x5, "error: program file name too long.\n");
 
     MEMCPY(misc8->program_file_name, arg + 2, program_file_name_l);
     misc8->program_file_name[program_file_name_l] = 0;
@@ -72,18 +72,18 @@ void load_program(misc8_t *misc8)
 
     FILE *program_file = fopen(misc8->program_file_name, "rb");
     if (program_file == NULL)
-        ERROR(0x7, "error: could not open file.");
+        ERROR_EXIT(0x7, "error: could not open file.");
 
     fseek(program_file, 0, SEEK_END);
     program_file_l = ftell(program_file);
     if (program_file_l > sizeof(misc8->program))
-        ERROR(0x8, "error: program too large");
+        ERROR_EXIT(0x8, "error: program too large");
 
     fseek(program_file, 0, SEEK_SET);
 
     bytes_read = fread(misc8->program, sizeof(char), program_file_l, program_file);
     if (bytes_read != program_file_l)
-        ERROR(0x9, "error: couldn't load entire file.");
+        ERROR_EXIT(0x9, "error: couldn't load entire file.");
 
     fclose(program_file);
 }
@@ -116,7 +116,7 @@ void run_program(misc8_t *misc8)
         printf("%s   %s\n", (misc8->carry_flag) ? "SET  " : "UNSET", (misc8->zero_flag) ? "SET  " : "UNSET");
     }
 
-    printf("\n\nProgram completed after %lu clock cycles.", misc8->cycles_to_complete);
+    printf("\n\nProgram completed after %llu clock cycles.", misc8->cycles_to_complete);
 }
 
 bool_t execute_instruction(misc8_t *misc8, u8_t instruction)
